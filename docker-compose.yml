@@ -1,0 +1,70 @@
+services:
+
+  broker:
+    image: docker.io/library/redis:8
+    restart: unless-stopped
+    volumes:
+      - /home/pi/paperless-ngx/redisdata:/data
+
+  db:
+    image: docker.io/library/postgres:18
+    restart: unless-stopped
+    volumes:
+      - /home/pi/paperless-ngx/pgdata:/var/lib/postgresql
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: paperless
+
+  scanbox:
+    image: scanbox:local
+    container_name: scanbox
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /home/pi/paperless-ngx/consume:/consume
+      - /var/run/dbus:/var/run/dbus
+    environment:
+      # --- Scanner-Verbindung ---
+      SCANNER_IP: "192.168.1.2"
+      SCANNER_PORT: "443"
+      # --- SANE Scan-Parameter ---
+      DEVICE: "airscan:e0:EPSON ET-4800 Series"
+      SOURCE: "ADF"
+      MODE: "Color"
+      RES: "300"
+      MAX_PAGES: "50"
+      # --- Poller-Verhalten ---
+      POLL_INTERVAL: "2"              # Sekunden zwischen Status-Abfragen
+      TRIGGER_DELAY: "10"             # Wartezeit vor Auto-Scan (1. Stapel)
+      DUPLEX_WINDOW: "30"             # Zeit zum Stapel umdrehen und einlegen
+      DUPLEX_STABLE: "3"              # ADF-Stabilitaet bevor Rueckseiten-Scan startet
+      COOLDOWN: "15"                  # Sperrzeit nach abgeschlossenem Scan
+      CONSUME_DIR: "/consume"
+      WORK_DIR: "/tmp/scanwork"
+      # --- Retry bei airscan Discovery-Verlust ---
+      SCAN_RETRIES: "3"
+      SCAN_RETRY_DELAY: "8"
+      # --- Leerseiten-Erkennung ---
+      BLANK_DETECT: "1"               # 1=aktiv, 0=deaktiviert
+      BLANK_MEAN_MIN: "0.985"         # Seite heller als 98.5% -> leer-Kandidat
+      BLANK_STDDEV_MAX: "0.05"        # Kontrast-Varianz <= 0.05 -> leer (Durchschein hat ~0.039, Text ~0.07+)
+
+  webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    restart: unless-stopped
+    depends_on:
+      - db
+      - broker
+    ports:
+      - "8010:8000"
+    volumes:
+      - /home/pi/paperless-ngx/data:/usr/src/paperless/data
+      - /home/pi/paperless-ngx/media:/usr/src/paperless/media
+      - /home/pi/paperless-ngx/export:/usr/src/paperless/export
+      - /home/pi/paperless-ngx/consume:/usr/src/paperless/consume
+    environment:
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBHOST: db
+    env_file:
+      - stack.env
