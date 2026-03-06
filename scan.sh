@@ -47,8 +47,10 @@ while (( attempt < SCAN_RETRIES )); do
     # "Invalid argument" = airscan Discovery weg -> warten und nochmal
     if echo "$SCAN_OUTPUT" | grep -q "Invalid argument"; then
         logE "airscan Discovery verloren (Invalid argument) - warte ${SCAN_RETRY_DELAY}s ..."
-        # Kurze scanimage -L um Discovery neu anzustossen
-        scanimage -L > /dev/null 2>&1
+        # Gezielter eSCL-Request statt scanimage -L (vermeidet Flachbett-Initialisierung)
+        SCANNER_IP="${SCANNER_IP:-192.168.1.190}"
+        SCANNER_PORT="${SCANNER_PORT:-443}"
+        curl -sk --max-time 3 "https://${SCANNER_IP}:${SCANNER_PORT}/eSCL/ScannerStatus" > /dev/null 2>&1
         sleep "$SCAN_RETRY_DELAY"
         continue
     fi

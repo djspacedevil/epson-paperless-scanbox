@@ -40,8 +40,9 @@ do_scan() {
     mkdir -p "$target_dir"
     /scan.sh "$target_dir"
     local rc=$?
-    # airscan Discovery nach Scan neu anstossen (verhindert "Invalid argument")
-    scanimage -L > /dev/null 2>&1
+    # airscan Discovery neu anstossen: gezielter eSCL-Request statt scanimage -L
+    # scanimage -L initialisiert ALLE Backends inkl. USB-Flachbett -> Lesekopf faehrt
+    curl -sk --max-time 3 "$ESCL_URL" > /dev/null 2>&1
     return $rc
 }
 
